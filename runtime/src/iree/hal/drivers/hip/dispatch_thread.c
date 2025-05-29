@@ -32,6 +32,7 @@ typedef struct iree_hal_hip_dispatch_thread_t {
   iree_status_t failure_status;
   iree_notification_t notification;
   bool do_exit;
+  iree_hal_stream_tracing_context_t* trace_context;
 } iree_hal_hip_dispatch_thread_t;
 
 static bool iree_hal_hip_dispatch_thread_has_request(void* user_data) {
@@ -51,11 +52,15 @@ static int iree_hal_hip_dispatch_thread_main(void* param) {
   while (true) {
     iree_notification_await(&thread->notification,
                             &iree_hal_hip_dispatch_thread_has_request, thread,
-                            iree_infinite_timeout());
+                            iree_make_timeout_ms(1000));
 
     iree_slim_mutex_lock(&thread->mutex);
     exit |= thread->do_exit;
     iree_status_t status = iree_status_clone(thread->failure_status);
+
+    if (thread->trace_context != NULL)
+      iree_hal_stream_tracing_context_update_calibration(thread->trace_context);
+
     while (!iree_hal_hip_dispatch_queue_empty(&thread->queue)) {
       iree_hal_hip_dispatch_thread_dispatch_t dispatch =
           iree_hal_hip_dispatch_queue_at(&thread->queue, 0);
@@ -86,7 +91,8 @@ static int iree_hal_hip_dispatch_thread_main(void* param) {
 
 iree_status_t iree_hal_hip_dispatch_thread_initialize(
     iree_allocator_t host_allocator,
-    iree_hal_hip_dispatch_thread_t** out_thread) {
+    iree_hal_hip_dispatch_thread_t** out_thread,
+    iree_hal_stream_tracing_context_t* trace_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
   *out_thread = NULL;
   iree_hal_hip_dispatch_thread_t* thread = NULL;
@@ -100,6 +106,7 @@ iree_status_t iree_hal_hip_dispatch_thread_initialize(
   iree_hal_hip_dispatch_queue_initialize(host_allocator, &thread->queue);
   thread->failure_status = iree_ok_status();
   thread->host_allocator = host_allocator;
+  thread->trace_context = trace_context;
   iree_notification_initialize(&thread->notification);
 
   iree_thread_create_params_t params;

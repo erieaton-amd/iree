@@ -11,7 +11,9 @@
 #error "32-bit not supported on HIP backend"
 #endif  // defined(IREE_PTR_SIZE_32)
 
+#ifndef __HIP_PLATFORM_AMD__
 #define __HIP_PLATFORM_AMD__
+#endif
 // Order matters here--hip_deprecated.h depends on hip_runtime_api.h. So turn
 // off clang-format.
 //

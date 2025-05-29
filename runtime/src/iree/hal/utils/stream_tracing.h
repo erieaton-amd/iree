@@ -130,6 +130,9 @@ iree_status_t iree_hal_stream_tracing_context_allocate(
 void iree_hal_stream_tracing_context_free(
     iree_hal_stream_tracing_context_t* context);
 
+iree_status_t iree_hal_stream_tracing_context_update_calibration(
+    iree_hal_stream_tracing_context_t* context);
+
 // Collects in-flight timestamp queries from the stream and feeds them to tracy.
 // Must be called frequently (every submission, etc) to drain the backlog;
 // tracing may start failing if the internal ringbuffer is exceeded.

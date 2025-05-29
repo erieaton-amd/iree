@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/utils/stream_tracing.h"
 
 // iree_hal_hip_dispatch_thread is used to get work off of the main thread.
 // This is important to do for a single reason. There are 2 types of
@@ -37,7 +38,8 @@ typedef iree_status_t (*iree_hal_hip_dispatch_callback_t)(void* user_data,
 // Initializes the dispatch thread for HIP driver.
 iree_status_t iree_hal_hip_dispatch_thread_initialize(
     iree_allocator_t host_allocator,
-    iree_hal_hip_dispatch_thread_t** out_thread);
+    iree_hal_hip_dispatch_thread_t** out_thread,
+    iree_hal_stream_tracing_context_t* trace_context);
 
 // Deinitializes the dispatch thread for HIP driver.
 void iree_hal_hip_dispatch_thread_deinitialize(

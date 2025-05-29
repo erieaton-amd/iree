@@ -87,6 +87,8 @@ struct iree_hal_stream_tracing_context_t {
   //    of event_freelist.
   iree_hal_stream_tracing_context_event_t
       event_pool[IREE_HAL_TRACING_DEFAULT_QUERY_CAPACITY];
+
+  uint64_t previous_cpu_time;
 };
 
 static iree_status_t iree_hal_stream_tracing_context_initial_calibration(
@@ -114,6 +116,56 @@ static iree_status_t iree_hal_stream_tracing_context_initial_calibration(
   // This may drift from the actual time differential between host/device but is
   // (maybe?) the best we can do.
   *out_cpu_timestamp = iree_tracing_time();
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_stream_tracing_context_update_calibration(
+    iree_hal_stream_tracing_context_t* context) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  uint64_t cpu_time = 0;
+  uint64_t gpu_time = 0;
+  iree_hal_stream_tracing_native_event_t test_event = NULL;
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+    z0, context->device_interface->vtable->create_native_event(
+      context->device_interface, test_event)
+  );
+
+  // Record event to the stream; in the absence of a synchronize this may not
+  // flush immediately.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, context->device_interface->vtable->record_native_event(context->device_interface,
+                                                        test_event));
+
+  // Force flush the event and wait for it to complete.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, context->device_interface->vtable->synchronize_native_event(context->device_interface,
+                                                            test_event));
+
+  // Calculate context-relative time and notify tracy.
+  float relative_millis = 0.0f;
+  context->device_interface->vtable->event_elapsed_time(
+      context->device_interface, &relative_millis, context->base_event,
+      test_event);
+
+  // Track when we know the event has completed and has a reasonable timestamp.
+  // This may drift from the actual time differential between host/device but is
+  // (maybe?) the best we can do.
+  cpu_time = iree_tracing_time();
+  gpu_time = (uint64_t)((double)relative_millis * 1000000.0);
+  
+  uint64_t tracy_time = cpu_time;
+  if (cpu_time > context->previous_cpu_time) {
+    uint64_t cpu_delta = cpu_time - context->previous_cpu_time;
+    context->previous_cpu_time = cpu_time;
+    iree_tracing_gpu_context_calibrate(context->id, cpu_delta, tracy_time,
+                                      gpu_time);
+  }
+
+  context->device_interface->vtable->destroy_native_event(
+    context->device_interface, test_event);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -188,7 +240,7 @@ iree_status_t iree_hal_stream_tracing_context_allocate(
   if (iree_status_is_ok(status)) {
     context->id = iree_tracing_gpu_context_allocate(
         IREE_TRACING_GPU_CONTEXT_TYPE_VULKAN, queue_name.data, queue_name.size,
-        /*is_calibrated=*/false, cpu_timestamp, gpu_timestamp,
+        /*is_calibrated=*/true, cpu_timestamp, gpu_timestamp,
         timestamp_period);
   }
 

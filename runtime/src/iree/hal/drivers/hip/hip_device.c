@@ -369,7 +369,7 @@ static iree_status_t iree_hal_hip_device_initialize_internal(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < device->device_count; ++i) {
       status = iree_hal_hip_dispatch_thread_initialize(
-          host_allocator, &device->devices[i].dispatch_thread);
+          host_allocator, &device->devices[i].dispatch_thread, device->devices[i].tracing_context);
       if (!iree_status_is_ok(status)) {
         break;
       }
