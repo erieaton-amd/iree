@@ -440,10 +440,6 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device_interface->dispatch_cu_stream = dispatch_stream;
   device_interface->host_allocator = host_allocator;
 
-  status = iree_hal_deferred_work_queue_create(
-      (iree_hal_deferred_work_queue_device_interface_t*)device_interface,
-      &device->block_pool, host_allocator, &device->work_queue);
-
   // Enable tracing for the (currently only) stream - no-op if disabled.
   if (iree_status_is_ok(status) && device->params.stream_tracing) {
     if (device->params.stream_tracing >=
@@ -479,6 +475,10 @@ static iree_status_t iree_hal_cuda_device_create_internal(
         device->identifier, device->params.stream_tracing, &device->block_pool,
         host_allocator, &device->tracing_context);
   }
+
+  status = iree_hal_deferred_work_queue_create(
+      (iree_hal_deferred_work_queue_device_interface_t*)device_interface,
+      &device->block_pool, host_allocator, &device->work_queue, device->tracing_context);
 
   // Memory pool support is conditional.
   if (iree_status_is_ok(status) && params->async_allocations) {

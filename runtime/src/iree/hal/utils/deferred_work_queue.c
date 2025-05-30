@@ -512,12 +512,15 @@ struct iree_hal_deferred_work_queue_t {
   // Once all pending enqueued work is complete the threads will exit.
   // No actions can be enqueued after requesting an exit.
   bool exit_requested IREE_GUARDED_BY(action_mutex);
+  
+  iree_hal_stream_tracing_context_t* trace_context;
 };
 
 iree_status_t iree_hal_deferred_work_queue_create(
     iree_hal_deferred_work_queue_device_interface_t* device_interface,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
-    iree_hal_deferred_work_queue_t** out_actions) {
+    iree_hal_deferred_work_queue_t** out_actions,
+    iree_hal_stream_tracing_context_t* trace_context) {
   IREE_ASSERT_ARGUMENT(device_interface);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_actions);
@@ -545,6 +548,7 @@ iree_status_t iree_hal_deferred_work_queue_create(
   actions->host_allocator = host_allocator;
   actions->block_pool = block_pool;
   actions->device_interface = device_interface;
+  actions->trace_context = trace_context;
 
   iree_slim_mutex_initialize(&actions->action_mutex);
   memset(&actions->action_list, 0, sizeof(actions->action_list));
@@ -1647,7 +1651,10 @@ static int iree_hal_deferred_work_queue_worker_execute(
         &working_area->state_notification,
         (iree_condition_fn_t)
             iree_hal_deferred_work_queue_worker_has_incoming_request,
-        working_area, iree_infinite_timeout());
+        working_area, iree_make_timeout_ms(1000));
+  
+    if (actions->trace_context != NULL)
+      iree_hal_stream_tracing_context_update_calibration(actions->trace_context);
 
     // Immediately flip the state to idle waiting if and only if the previous
     // state is workload pending. We do it before processing ready list to make

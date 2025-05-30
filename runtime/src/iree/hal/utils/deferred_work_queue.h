@@ -11,6 +11,7 @@
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/semaphore_base.h"
+#include "iree/hal/utils/stream_tracing.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,7 +133,8 @@ typedef struct iree_hal_deferred_work_queue_device_interface_vtable_t {
 iree_status_t iree_hal_deferred_work_queue_create(
     iree_hal_deferred_work_queue_device_interface_t* symbols,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
-    iree_hal_deferred_work_queue_t** out_queue);
+    iree_hal_deferred_work_queue_t** out_queue,
+    iree_hal_stream_tracing_context_t* trace_context);
 
 void iree_hal_deferred_work_queue_destroy(
     iree_hal_deferred_work_queue_t* queue);
